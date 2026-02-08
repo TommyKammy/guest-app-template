@@ -97,7 +97,7 @@ jobs:
                       raise RuntimeError(f"Vercel project create failed: {e.code} {body[:300]}")
 
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
-              f.write(f"VERCEL_PROJECT_ID={project_id}\\n")
+              f.write(f"VERCEL_PROJECT_ID={project_id}\n")
 
           print(f"Resolved Vercel project: {project_name} ({project_id})")
           PY
