@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 export default function HomePage() {
-  const [isLight, setIsLight] = useState(false);
+  const [isLight, setIsLight] = useState(true);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("ui-theme");
-    const nextIsLight = stored === "light";
+    const nextIsLight = stored !== "dark";
     setIsLight(nextIsLight);
   }, []);
 
@@ -32,7 +32,7 @@ export default function HomePage() {
                   : "rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
               }
             >
-              {isLight ? "Use Current Color" : "Use White"}
+              {isLight ? "Dark" : "White"}
             </button>
             <Link
               href="/api/health"
