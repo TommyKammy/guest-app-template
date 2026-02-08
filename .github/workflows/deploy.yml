@@ -36,7 +36,9 @@ jobs:
             npm i -g vercel
             vercel pull --yes --environment=production --token="${VERCEL_TOKEN}"
             vercel build --prod --token="${VERCEL_TOKEN}"
-            DEPLOY_URL=$(vercel deploy --prebuilt --prod --token="${VERCEL_TOKEN}")
+            DEPLOY_URL=$(vercel deploy --prebuilt --prod --token="${VERCEL_TOKEN}" \
+              --meta githubCommitAuthorName="Tomoaki Kawada" \
+              --meta githubCommitAuthorEmail="tomoaki.w.kawada@gmail.com")
             echo "DEPLOY_STATUS=deployed" >> "$GITHUB_ENV"
             echo "DEPLOY_URL=${DEPLOY_URL}" >> "$GITHUB_ENV"
           else
