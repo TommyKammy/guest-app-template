@@ -30,6 +30,82 @@ jobs:
           echo "DEPLOY_STATUS=pending_vercel_setup" >> "$GITHUB_ENV"
           echo "DEPLOY_URL=" >> "$GITHUB_ENV"
 
+      - name: Resolve or create Vercel project
+        run: |
+          if [ -z "${VERCEL_TOKEN}" ] || [ -z "${VERCEL_ORG_ID}" ]; then
+            echo "Vercel token/org missing; skipping project resolution"
+            exit 0
+          fi
+
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.error
+          import urllib.request
+
+          token = os.environ["VERCEL_TOKEN"]
+          team_id = os.environ["VERCEL_ORG_ID"]
+          repo = os.environ.get("GITHUB_REPOSITORY", "guest-app-template")
+          raw_name = repo.split("/")[-1].strip().lower()
+          project_name = re.sub(r"[^a-z0-9-]", "-", raw_name).strip("-") or "guest-app"
+
+          headers = {
+              "Authorization": f"Bearer {token}",
+              "Content-Type": "application/json",
+          }
+
+          def request(method: str, url: str, payload=None):
+              data = None
+              if payload is not None:
+                  data = json.dumps(payload).encode("utf-8")
+              req = urllib.request.Request(url, data=data, method=method, headers=headers)
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  return json.loads(resp.read().decode("utf-8"))
+
+          project_id = os.environ.get("VERCEL_PROJECT_ID", "").strip()
+
+          if not project_id:
+              lookup_url = f"https://api.vercel.com/v9/projects/{project_name}?teamId={team_id}"
+              try:
+                  found = request("GET", lookup_url)
+                  project_id = found["id"]
+              except urllib.error.HTTPError as e:
+                  if e.code != 404:
+                      body = e.read().decode("utf-8", errors="ignore")
+                      raise RuntimeError(f"Vercel project lookup failed: {e.code} {body[:300]}")
+
+          if not project_id:
+              create_url = f"https://api.vercel.com/v10/projects?teamId={team_id}"
+              payload = {
+                  "name": project_name,
+                  "framework": "nextjs",
+                  "buildCommand": "npm run build",
+                  "devCommand": "npm run dev",
+                  "installCommand": "npm install",
+              }
+              try:
+                  created = request("POST", create_url, payload)
+                  project_id = created["id"]
+              except urllib.error.HTTPError as e:
+                  body = e.read().decode("utf-8", errors="ignore")
+                  if e.code == 409:
+                      lookup_url = f"https://api.vercel.com/v9/projects/{project_name}?teamId={team_id}"
+                      found = request("GET", lookup_url)
+                      project_id = found["id"]
+                  else:
+                      raise RuntimeError(f"Vercel project create failed: {e.code} {body[:300]}")
+
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
+              f.write(f"VERCEL_PROJECT_ID={project_id}\\n")
+
+          print(f"Resolved Vercel project: {project_name} ({project_id})")
+          PY
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
       - name: Deploy to Vercel
         run: |
           if [ -n "${VERCEL_TOKEN}" ] && [ -n "${VERCEL_ORG_ID}" ] && [ -n "${VERCEL_PROJECT_ID}" ]; then
